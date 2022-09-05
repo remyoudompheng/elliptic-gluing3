@@ -7,6 +7,9 @@ Full computation of triple cover
 3. Compute sextic equation
 4. Determine rational parameterisation
 5. Determine hyperelliptic form and morphisms
+
+For large F_q (log q > 750 bits) the cost starts
+being dominated by the 2 square roots.
 """
 
 from sage.all import (
@@ -54,6 +57,8 @@ def triple_cover(E1, T11, T12, E2, T21, T22):
     DX = X.denominator()
     NY = Y.numerator()
     DY = Y.denominator()
+    if all(pol.degree() <= 2 for pol in [NX, DX, NY, DY]):
+        raise ValueError("H is singular")
     PPX, rem = (P1[3]*NX**3 + P1[2]*NX**2*DX + P1[1]*NX*DX**2 + P1[0]* DX**3).quo_rem(DY)
     assert rem == 0
     const1 = PPX.lc()
@@ -262,7 +267,8 @@ def resolve_sing(S, nodes, w1s, w2s):
         rat = (rat[2] / rat[0], rat[2] / rat[1], 1)  # normalized (yz,zx,xy)
     else:
         # Try to find a rational point on a finite field
-        for xval in range(20):
+        for _ in range(20):
+            xval = K.random_element()
             ys = C(x=xval, z=1).univariate_polynomial().roots(multiplicities=False)
             if ys:
                 # print("rational point", (xval, ys[0], 1))

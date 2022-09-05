@@ -6,6 +6,7 @@ from sage.all import (
 )
 from gluing3 import triple_cover, make_morphism
 
+
 def random_curve():
     "Returns curves with rational 3-torsion"
     K = GF(4099)  # 3k+1
@@ -15,11 +16,11 @@ def random_curve():
         if 4 * a**3 + 27 * b**2 == 0:
             continue
         E = EllipticCurve(K, [a, b])
-        EG = E.abelian_group()
-        invs = EG.invariants()
-        if len(invs) == 2 and all(x % 3 == 0 for x in invs):
-            T1, T2 = EG.torsion_subgroup(3).gens()
-            return E, T1.element(), T2.element()
+        try:
+            T1, T2 = torsion_basis(E)
+            return E, T1, T2
+        except ValueError:
+            continue
 
 
 def random_point(H):
@@ -30,44 +31,52 @@ def random_point(H):
             return (x, H(x).sqrt())
 
 
+def make_curve(t):
+    K = t.parent()
+    p3 = 4 * (t**3 - 1) / 3
+    p2 = -3 * t**2
+    p1 = 2 * t
+    p0 = 1 / K(-3)
+    return EllipticCurve(K, [0, p2 / p3**2, 0, p1 / p3**3, p0 / p3**4])
+
+
+def torsion_basis(E):
+    P3 = E.division_polynomial(3)
+    roots = P3.roots(multiplicities=False)
+    if len(roots) < 2:
+        raise ValueError("not enough 3-torsion")
+    r1, r2 = roots[:2]
+    T1 = E.lift_x(r1)
+    T2 = E.lift_x(r2)
+    assert T1.weil_pairing(T2, 3) != 1
+    return T1, T2
+
+
 def main():
     from sage.all import timeit
 
     # Example from equation.sage
     K = GF(2011)
     E1 = EllipticCurve(K, [0, -20, 0, 696, -232])
-    T11, T12 = E1.abelian_group().torsion_subgroup(3).gens()
+    T11, T12 = torsion_basis(E1)
     E2 = EllipticCurve(K, [0, 674 * 2, 0, 441 * 4, -147 * 8])
-    T21, T22 = E2.abelian_group().torsion_subgroup(3).gens()
+    T21, T22 = torsion_basis(E2)
 
     print(f"=== {K} ===")
-    print(
-        timeit(
-            "triple_cover(E1, T11.element(), T12.element(), E2, T21.element(), T22.element())",
-            globals=locals() | globals(),
-            number=200,
-        )
-    )
+    triple_cover(E1, T11, T12, E2, T21, T22)
 
-    # SIKE-like, benchmark
-    # p = 2**110 * 3**67 - 1
-    p = 2**33 * 3**19 - 1
+    # SIKE-like
+    p = 2**110 * 3**67 - 1
     K = GF(p**2)
     print(f"=== {K} ===")
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(13)[1].codomain()
     E2 = E.isogenies_prime_degree(17)[1].codomain()
-    T11, T12 = E1.abelian_group().torsion_subgroup(3).gens()
-    T21, T22 = E2.abelian_group().torsion_subgroup(3).gens()
+    T11, T12 = torsion_basis(E1)
+    T21, T22 = torsion_basis(E2)
 
     print("curves are ready.")
-    print(
-        timeit(
-            "triple_cover(E1, T11.element(), T12.element(), E2, T21.element(), T22.element())",
-            globals=locals() | globals(),
-            number=20,
-        )
-    )
+    triple_cover(E1, T11, T12, E2, T21, T22)
 
 
 def stress():
@@ -80,7 +89,7 @@ def stress():
         E2, T21, T22 = random_curve()
         data.append([E1, T11, T12, E2, T21, T22])
     print("Compute triple covers")
-    for args in tqdm(data * 100):
+    for args in tqdm(data):
         E1, T11, T12, E2, T21, T22 = args
         H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
         for _ in range(40):
@@ -89,6 +98,7 @@ def stress():
                 continue  # weierstrass points go to infinity
             assert f1(xH, yH) in E1
             assert f2(xH, yH) in E2
+
 
 def dorandom(q):
     K = GF(q)
@@ -99,24 +109,17 @@ def dorandom(q):
         t2 = K.random_element()
     compute(t1, t2)
 
+
 def compute(t1, t2):
     K = t1.parent()
     R = K["x", "y", "z"]
     x, y, z = R.gens()
-    E1 = EllipticCurve_from_cubic(
-        x**3 + y**3 + z**3 - 3 * t1 * x * y * z, [1, -1, 0]
-    )
-    E2 = EllipticCurve_from_cubic(
-        x**3 + y**3 + z**3 - 3 * t2 * x * y * z, [1, -1, 0]
-    )
-    E1 = E1.codomain().short_weierstrass_model()
-    E2 = E2.codomain().short_weierstrass_model()
+    E1 = make_curve(t1)
+    E2 = make_curve(t2)
     print(E1)
     print(E2)
-    E1_3 = E1.abelian_group().torsion_subgroup(3)
-    E2_3 = E2.abelian_group().torsion_subgroup(3)
-    T11, T12 = [p.element() for p in E1_3.gens()]
-    T21, T22 = [p.element() for p in E2_3.gens()]
+    T11, T12 = torsion_basis(E1)
+    T21, T22 = torsion_basis(E2)
     H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
     print(H)
     print("=== First projection ===")
@@ -128,6 +131,47 @@ def compute(t1, t2):
     print(p2)
     print(p2.image())
 
+
+def validate_morphisms(H, f1, f2, E1, E2, checks=1000):
+    P1 = E1.defining_polynomial()
+    P2 = E2.defining_polynomial()
+    K = H.base_ring()
+    ok = 0
+    if K.order() < checks:
+        elems = list(K)
+    else:
+        elems = [K.random_element() for _ in range(checks)]
+    for xH in elems:
+        if H(xH) != 0 and H(xH).is_square():
+            yH = H(xH).sqrt()
+            x1, y1 = f1(xH, yH)
+            assert P1(x1, y1, 1) == 0
+            x2, y2 = f2(xH, yH)
+            assert P2(x2, y2, 1) == 0
+        ok += 1
+    assert ok > len(elems) // 3
+
+
+def test_random(q, n_curves=100):
+    K = GF(q)
+    for _ in range(n_curves):
+        t1, t2 = 1, 1
+        while t1**3 == 1:
+            t1 = K.random_element()
+        while t2**3 == 1:
+            t2 = K.random_element()
+        E1 = make_curve(t1)
+        E2 = make_curve(t2)
+        T11, T12 = torsion_basis(E1)
+        T21, T22 = torsion_basis(E2)
+        try:
+            H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
+            validate_morphisms(H, f1, f2, E1, E2, checks=100)
+            print(f"GF({q}) t1={t1} t2={t2}", "OK")
+        except ValueError as e:
+            print(f"GF({q}) t1={t1} t2={t2}", e)
+
+
 def triple():
     K = GF(13)
     R = K["x", "y", "z"]
@@ -136,10 +180,8 @@ def triple():
     E2 = EllipticCurve(K, [0, 3])
     print(E1)
     print(E2)
-    E1_3 = E1.abelian_group().torsion_subgroup(3)
-    E2_3 = E2.abelian_group().torsion_subgroup(3)
-    T11, T12 = [p.element() for p in E1_3.gens()]
-    T21, T22 = [p.element() for p in E2_3.gens()]
+    T11, T12 = torsion_basis(E1)
+    T21, T22 = torsion_basis(E2)
     H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
     print(H)
     print("=== First projection ===")
@@ -160,6 +202,8 @@ if __name__ == "__main__":
             stress()
         case ["random", q, *_]:
             dorandom(int(q))
+        case ["testrandom", q, *_]:
+            test_random(int(q))
         case ["triple"]:
             triple()
         case _:
