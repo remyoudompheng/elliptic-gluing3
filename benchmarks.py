@@ -34,9 +34,12 @@ def _bench_curves(E1, T11, T12, E2, T21, T22, n=5):
     avg = (time.time() - t0) / (10 * n)
     print(f"{10*n} iters, {avg*100:.1f}ms/iter")
 
-    if E1.base_ring().characteristic() >= 2**31:
-        return
     print("testing BHLS")
+    K = E1.base_ring()
+    if K.degree() > 1 and K.characteristic() >= 2**29:
+        n = 1
+    if K.characteristic() >= 2**31:
+        n = 1
     try:
         t0 = time.time()
         for _ in range(n):

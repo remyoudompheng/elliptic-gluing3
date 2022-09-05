@@ -29,6 +29,17 @@ speed_hack()
 
 def solve_params(j1, j2):
     k = j1.parent()
+    if k.degree() == 1 and k.characteristic() < 2**31:
+        return solve_params1(k, j1, j2)
+    elif k.characteristic() < 2**29:
+        return solve_params1(k, j1, j2)
+    elif k.degree() == 1:
+        return solve_params2(k, j1, j2)
+    else:
+        raise ValueError("cannot run on large prime power fields")
+
+
+def solve_params1(k, j1, j2):
     R = k["w", "x", "y", "z"]
     w, x, y, z = R.gens()
     # fmt:off
@@ -56,8 +67,50 @@ def solve_params(j1, j2):
                 yield vw, vx, v, v
 
 
+def solve_params2(k, j1, j2):
+    R = k["w", "x", "y", "z"]
+    w, x, y, z = R.gens()
+    # fmt:off
+    g1 = 1728*(w*w*y + 4*w*x*z - 4*x*x*y*y)**3 - j1*(w**3 + x**2)**2 * (y**3 + z**2)
+    g2 = 1728*(w*y*y + 4*x*y*z - 4*w*w*z*z)**3 - j2*(w**3 + x**2) * (y**3 + z**2)**2
+    g3 = 12*w*y + 16*x*z - 1
+    # fmt:on
+
+    I = R.ideal([g1, g2, g3])
+    # Solve w=x
+    Iwx = _eliminate_last(R, I.subs(x=w))
+    assert Iwx.variables() == (w,)
+    for v in _uniroots(Iwx):
+        Iy = _eliminate_last(R, I.subs(w=v, x=v))
+        assert Iy.variables() == (y,)
+        for vy in _uniroots(Iy):
+            for vz in _uniroots(g3(w=v, x=v, y=vy)):
+                assert all(g(v, v, vy, vz) == 0 for g in (g1, g2, g3))
+                yield v, v, vy, vz
+    # Solve y=z
+    Iyz = _eliminate_first(R, I.subs(y=z))
+    assert Iyz.variables() == (z,)
+    for v in _uniroots(Iyz):
+        Iw = _eliminate_last(R, I.subs(y=v, z=v))
+        assert Iw.variables() == (w,)
+        for vw in _uniroots(Iw):
+            for vx in _uniroots(g3(w=vw, y=v, z=v)):
+                assert all(g(vw, vx, v, v) == 0 for g in (g1, g2, g3))
+                yield vw, vx, v, v
+
+
 def _uniroots(p):
     return p.univariate_polynomial().roots(multiplicities=False)
+
+
+def _eliminate_last(R, ideal):
+    G = ideal.change_ring(R.change_ring(order="invlex")).groebner_basis()
+    return G[-1]
+
+
+def _eliminate_first(R, ideal):
+    G = ideal.change_ring(R.change_ring(order="lex")).groebner_basis()
+    return G[-1]
 
 
 def bhls_curves(a, b, c, d):
