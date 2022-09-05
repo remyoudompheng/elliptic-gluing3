@@ -4,6 +4,8 @@ from sage.all import (
     EllipticCurve_from_cubic,
     GF,
 )
+from testutils import make_curve, torsion_basis
+
 from gluing3 import triple_cover, make_morphism
 
 
@@ -29,27 +31,6 @@ def random_point(H):
         x = K.random_element()
         if H(x).is_square():
             return (x, H(x).sqrt())
-
-
-def make_curve(t):
-    K = t.parent()
-    p3 = 4 * (t**3 - 1) / 3
-    p2 = -3 * t**2
-    p1 = 2 * t
-    p0 = 1 / K(-3)
-    return EllipticCurve(K, [0, p2 / p3**2, 0, p1 / p3**3, p0 / p3**4])
-
-
-def torsion_basis(E):
-    P3 = E.division_polynomial(3)
-    roots = P3.roots(multiplicities=False)
-    if len(roots) < 2:
-        raise ValueError("not enough 3-torsion")
-    r1, r2 = roots[:2]
-    T1 = E.lift_x(r1)
-    T2 = E.lift_x(r2)
-    assert T1.weil_pairing(T2, 3) != 1
-    return T1, T2
 
 
 def main():
@@ -152,7 +133,7 @@ def validate_morphisms(H, f1, f2, E1, E2, checks=1000):
     assert ok > len(elems) // 3
 
 
-def test_random(q, n_curves=100):
+def _test_random(q, n_curves=100):
     K = GF(q)
     for _ in range(n_curves):
         t1, t2 = 1, 1
@@ -203,7 +184,7 @@ if __name__ == "__main__":
         case ["random", q, *_]:
             dorandom(int(q))
         case ["testrandom", q, *_]:
-            test_random(int(q))
+            _test_random(int(q))
         case ["triple"]:
             triple()
         case _:

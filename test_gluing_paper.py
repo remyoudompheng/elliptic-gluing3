@@ -1,7 +1,9 @@
 from sage.all import proof, EllipticCurve, GF, Integer
+from testutils import make_curve, torsion_basis
 from gluing_paper import triple_cover
 
 proof.arithmetic(False)
+
 
 def validate_morphisms(H, f1, f2, E1, E2, checks=1000):
     P1 = E1.defining_polynomial()
@@ -23,26 +25,15 @@ def validate_morphisms(H, f1, f2, E1, E2, checks=1000):
     assert ok > len(elems) // 3
 
 
-def make_curve(t):
-    K = t.parent()
-    p3 = 4 * (t**3 - 1) / 3
-    p2 = -3 * t**2
-    p1 = 2 * t
-    p0 = 1 / K(-3)
-    return EllipticCurve(K, [0, p2 / p3**2, 0, p1 / p3**3, p0 / p3**4])
-
-
 def _test_small_field(q):
     K = GF(q)
     elems = [t for t in K if t**3 != 1]
     for i, t1 in enumerate(elems):
-        for t2 in elems[:i+1]:
+        for t2 in elems[: i + 1]:
             E1 = make_curve(t1)
             E2 = make_curve(t2)
-            E1_3 = E1.abelian_group().torsion_subgroup(3)
-            E2_3 = E2.abelian_group().torsion_subgroup(3)
-            T11, T12 = [p.element() for p in E1_3.gens()]
-            T21, T22 = [p.element() for p in E2_3.gens()]
+            T11, T12 = torsion_basis(E1)
+            T21, T22 = torsion_basis(E2)
             H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
             if f1 is not None:
                 validate_morphisms(H, f1, f2, E1, E2)
@@ -61,10 +52,8 @@ def _test_random(q, n_curves=100):
             t2 = K.random_element()
         E1 = make_curve(t1)
         E2 = make_curve(t2)
-        E1_3 = E1.abelian_group().torsion_subgroup(3)
-        E2_3 = E2.abelian_group().torsion_subgroup(3)
-        T11, T12 = [p.element() for p in E1_3.gens()]
-        T21, T22 = [p.element() for p in E2_3.gens()]
+        T11, T12 = torsion_basis(E1)
+        T21, T22 = torsion_basis(E2)
         H, f1, f2 = triple_cover(E1, T11, T12, E2, T21, T22)
         if f1 is not None:
             validate_morphisms(H, f1, f2, E1, E2, checks=100)
@@ -107,7 +96,7 @@ if __name__ == "__main__":
     test_F19()
     test_F25()
     test_F31()
-    #for q in range(37, 100, 3):
+    # for q in range(37, 100, 3):
     for q in range(67, 200, 3):
         if q % 2 == 1 and Integer(q).is_prime_power():
             _test_small_field(q)
