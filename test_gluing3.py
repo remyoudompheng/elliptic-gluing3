@@ -31,7 +31,7 @@ def random_point(H):
 
 
 def main():
-    from sage.all import timeit, cached_method
+    from sage.all import timeit
 
     # Example from equation.sage
     K = GF(2011)
@@ -54,8 +54,6 @@ def main():
     p = 2**33 * 3**19 - 1
     K = GF(p**2)
     print(f"=== {K} ===")
-    # Speed hack
-    type(K).vector_space = cached_method(type(K).vector_space)
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(13)[1].codomain()
     E2 = E.isogenies_prime_degree(17)[1].codomain()

@@ -24,11 +24,22 @@ from sage.all import (
 
 # No strict primality proof
 proof.arithmetic(False)
+# Speed hack
+def speed_hack():
+    from sage.all import cached_method
+
+    p = 2**127 - 1  # Arbitrary large prime
+    to_patch = [GF(3), GF(3**2), GF(p), GF(p**2)]
+    for x in to_patch:
+        type(x).vector_space = cached_method(type(x).vector_space)
+
+
+speed_hack()
 
 
 def triple_cover(E1, T11, T12, E2, T21, T22):
     K = E1.base_field()
-    j = K(1).nth_root(3)
+    j = T11.weil_pairing(T12, 3)
     t1, P1, a1, b1, c1 = normalize_curve(E1, j, T11, T12)
     t2, P2, a2, b2, c2 = normalize_curve(E2, j, T21, T22)
     # Beware: exchanging t1/t2 also exchanges j and j2
@@ -36,25 +47,25 @@ def triple_cover(E1, T11, T12, E2, T21, T22):
     YD0, YD1, YD2, YD3 = double_coords(j**2, t2, t1)
     nodes = [(XD0, YD0), (XD1, YD1), (XD2, YD2), (XD3, YD3)]
     S = make_sextic(P1.monic(), P2.monic(), nodes)
-    w1s = P1.roots(multiplicities=False)
-    w2s = P2.roots(multiplicities=False)
-    X, Y = resolve_sing(S, nodes, w1s, w2s)
+    # w1s = P1.roots(multiplicities=False)
+    # w2s = P2.roots(multiplicities=False)
+    X, Y = resolve_sing(S, nodes, None, None)
     NX = X.numerator()
     DX = X.denominator()
     NY = Y.numerator()
     DY = Y.denominator()
-    PPX, rem = (P1(NX / DX) * DX**3).numerator().quo_rem(DY)
+    PPX, rem = (P1[3]*NX**3 + P1[2]*NX**2*DX + P1[1]*NX*DX**2 + P1[0]* DX**3).quo_rem(DY)
     assert rem == 0
     const1 = PPX.lc()
     PX = const1 * PPX.monic().sqrt()
-    PPY, rem = (P2(NY / DY) * DY**3).numerator().quo_rem(DX)
+    PPY, rem = (P2[3]*NY**3 + P2[2]*NY**2*DY + P2[1]*NY*DY**2 + P2[0]* DY**3).quo_rem(DX)
     assert rem == 0
     const2 = PPY.lc()
     PY = const2 * PPY.monic().sqrt()
     # (x, y) => (NX/DX, PX/DX*y)
-    assert (PX / DX**2) ** 2 * (DX * DY) == const1 * P1(NX / DX)
+    #assert (PX / DX**2) ** 2 * (DX * DY) == const1 * P1(NX / DX)
     # (x, y) => (NY/DY, PY/DY*y)
-    assert (PY / DY**2) ** 2 * (DX * DY) == const2 * P2(NY / DY)
+    #assert (PY / DY**2) ** 2 * (DX * DY) == const2 * P2(NY / DY)
 
     c12 = (const1 * const2).sqrt()
 
@@ -106,7 +117,7 @@ def normalize_curve(E, j, T1, T2):
     t = (-j - 2) * (xT12 - xT2) / (xT12 - xT1) + 1
     a = (xT1 - xT2) * (t - 1)
     b = xT2
-    c = (1 - t) * T1[1] # y(T1) = -x(T1)
+    c = (1 - t) * T1[1]  # y(T1) = -x(T1)
 
     a1, a2, a3, a4, a6 = E.a_invariants()
     assert a1 == 0 and a3 == 0
@@ -118,13 +129,15 @@ def normalize_curve(E, j, T1, T2):
 
 
 def double_coords(j, t1, t2):
+    # fmt:off
     d0 = (t1**2 - t2) / (t1**3 - 1)
     num1 = j*(t1*t2 - 1)
-    den1 = num1*t1 - (t1**2 - j**2 * t1 * t2 - t2 + j**2)
+    den1 = num1*t1 - (t1**2 - j**2*t1*t2 - t2 + j**2)
     num2 = j**2*(t1*t2 - 1)
-    den2 = num2*t1 - (t1**2 - j * t1 * t2 - t2 + j)
+    den2 = num2*t1 - (t1**2 - j*t1*t2 - t2 + j)
     num3 = t1*t2 - 1
-    den3 = num3*t1 - (t1**2 - t1 * t2 - t2 + 1)
+    den3 = num3*t1 - (t1**2 - t1*t2 - t2 + 1)
+    # fmt:on
     return d0, num1 / den1, num2 / den2, num3 / den3
 
 
@@ -227,14 +240,13 @@ def resolve_sing(S, nodes, w1s, w2s):
         return X, Y
 
     (x1, y1), (x2, y2), (x3, y3) = N1, N2, N3
-    M = Matrix(
-        K,
-        [
-            [y1 - y0, x1 - x0, (x1 - x0) * (y1 - y0)],
-            [y2 - y0, x2 - x0, (x2 - x0) * (y2 - y0)],
-            [y3 - y0, x3 - x0, (x3 - x0) * (y3 - y0)],
-        ],
-    ).transpose()
+    # fmt:off
+    M = Matrix(K, [
+        [y1-y0, x1-x0, (x1-x0)*(y1-y0)],
+        [y2-y0, x2-x0, (x2-x0)*(y2-y0)],
+        [y3-y0, x3-x0, (x3-x0)*(y3-y0)],
+    ]).transpose()
+    # fmt:on
 
     u, v, w = M * vector([x, y, z])
     QT = Q(u, v, w)
@@ -271,5 +283,3 @@ def resolve_sing(S, nodes, w1s, w2s):
     X = x0 + x_S1 / z_S1
     Y = y0 + y_S1 / z_S1
     return X, Y
-
-

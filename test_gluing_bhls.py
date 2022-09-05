@@ -42,6 +42,18 @@ def test_basic():
     h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
     check_morphisms(E1, E2, h, p1, p1)
 
+def test_large():
+    p = 2**31-1
+    K = GF(p)
+    E1 = make_curve(K(0xdeadc0de))
+    E2 = make_curve(K(0x600dc0de))
+    E1_3 = E1.abelian_group().torsion_subgroup(3)
+    E2_3 = E2.abelian_group().torsion_subgroup(3)
+    T11, T12 = [t.element() for t in E1_3.gens()]
+    T21, T22 = [t.element() for t in E2_3.gens()]
+
+    h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
+    check_morphisms(E1, E2, h, p1, p1)
 
 def make_curve(t):
     K = t.parent()

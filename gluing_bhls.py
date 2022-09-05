@@ -6,11 +6,25 @@ Reinier Bröker, Everett W. Howe, Kristin E. Lauter, Peter Stevenhagen
 https://arxiv.org/abs/1403.6911
 """
 
-from sage.all import EllipticCurve, CRT, HyperellipticCurve
+from sage.all import EllipticCurve, CRT, GF, HyperellipticCurve, proof
 from sage.schemes.hyperelliptic_curves.jacobian_morphism import (
     cantor_reduction,
     cantor_reduction_simple,
 )
+
+# No strict primality proof
+proof.arithmetic(False)
+# Speed hack
+def speed_hack():
+    from sage.all import cached_method
+
+    p = 2**127 - 1  # Arbitrary large prime
+    to_patch = [GF(3), GF(3**2), GF(p), GF(p**2)]
+    for x in to_patch:
+        type(x).vector_space = cached_method(type(x).vector_space)
+
+
+speed_hack()
 
 
 def solve_params(j1, j2):
@@ -23,12 +37,27 @@ def solve_params(j1, j2):
     g3 = 12*w*y + 16*x*z - 1
     # fmt:on
 
-    I = R.ideal([g1, g2, g3, w - x])
-    for pt in I.variety():
-        yield pt["w"], pt["x"], pt["y"], pt["z"]
-    I = R.ideal([g1, g2, g3, y - z])
-    for pt in I.variety():
-        yield pt["w"], pt["x"], pt["y"], pt["z"]
+    I = R.ideal([g1, g2, g3])
+    # Solve w=x
+    Iwx = I.subs(w=x).elimination_ideal([y, z])
+    for v in _uniroots(Iwx.basis[0]):
+        Iy = I.subs(w=v, x=v).elimination_ideal(z)
+        for vy in _uniroots(Iy.basis[0]):
+            for vz in _uniroots(g3(w=v, x=v, y=vy)):
+                # print(v, v, vy, vz)
+                yield v, v, vy, vz
+    # Solve y=z
+    Iyz = I.subs(y=z).elimination_ideal([w, x])
+    for v in _uniroots(Iyz.basis[0]):
+        Iw = I.subs(y=v, z=v).elimination_ideal(x)
+        for vw in _uniroots(Iw.basis[0]):
+            for vx in _uniroots(g3(w=vw, y=v, z=v)):
+                # print(vw, vx, v, v)
+                yield vw, vx, v, v
+
+
+def _uniroots(p):
+    return p.univariate_polynomial().roots(multiplicities=False)
 
 
 def bhls_curves(a, b, c, d):
