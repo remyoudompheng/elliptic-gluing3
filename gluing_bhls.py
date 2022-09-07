@@ -6,7 +6,7 @@ Reinier Bröker, Everett W. Howe, Kristin E. Lauter, Peter Stevenhagen
 https://arxiv.org/abs/1403.6911
 """
 
-from sage.all import EllipticCurve, CRT, GF, HyperellipticCurve, proof
+from sage.all import EllipticCurve, CRT, GF, HyperellipticCurve, PolynomialRing, proof
 from sage.schemes.hyperelliptic_curves.jacobian_morphism import (
     cantor_reduction,
     cantor_reduction_simple,
@@ -68,49 +68,59 @@ def solve_params1(k, j1, j2):
 
 
 def solve_params2(k, j1, j2):
-    R = k["w", "x", "y", "z"]
+    vars = ["w", "x", "y", "z"]
+    R = PolynomialRing(k, names=vars)
     w, x, y, z = R.gens()
+    if k.degree() > 1 and k.characteristic() >= 2**29:
+        # Singular does not support it
+        gb_algo = "toy"
+        Rinvlex = PolynomialRing(
+            k, names=vars, implementation="generic", order="invlex"
+        )
+        Rlex = PolynomialRing(k, names=vars, implementation="generic", order="lex")
+    else:
+        gb_algo = ""
+        Rinvlex = R.change_ring(order="invlex")
+        Rlex = R.change_ring(order="lex")
     # fmt:off
     g1 = 1728*(w*w*y + 4*w*x*z - 4*x*x*y*y)**3 - j1*(w**3 + x**2)**2 * (y**3 + z**2)
     g2 = 1728*(w*y*y + 4*x*y*z - 4*w*w*z*z)**3 - j2*(w**3 + x**2) * (y**3 + z**2)**2
     g3 = 12*w*y + 16*x*z - 1
     # fmt:on
 
-    I = R.ideal([g1, g2, g3])
     # Solve w=x
-    Iwx = _eliminate_last(R, I.subs(x=w))
-    assert Iwx.variables() == (w,)
-    for v in _uniroots(Iwx):
-        Iy = _eliminate_last(R, I.subs(w=v, x=v))
-        assert Iy.variables() == (y,)
-        for vy in _uniroots(Iy):
+    I = R.ideal([g1, g2, g3])
+    Iwx = I.subs(x=w).change_ring(Rinvlex).groebner_basis(algorithm=gb_algo)
+    assert Iwx[-1].variables() == (w,)
+    for v in _uniroots(Iwx[-1]):
+        for _p in reversed(Iwx):
+            if _p.degree(y) > 0:
+                py = _p.subs(w=v)
+                if not py.is_constant():
+                    assert py.variables() == (y,)
+                    break
+        for vy in _uniroots(py):
             for vz in _uniroots(g3(w=v, x=v, y=vy)):
                 assert all(g(v, v, vy, vz) == 0 for g in (g1, g2, g3))
                 yield v, v, vy, vz
     # Solve y=z
-    Iyz = _eliminate_first(R, I.subs(y=z))
-    assert Iyz.variables() == (z,)
-    for v in _uniroots(Iyz):
-        Iw = _eliminate_last(R, I.subs(y=v, z=v))
-        assert Iw.variables() == (w,)
-        for vw in _uniroots(Iw):
-            for vx in _uniroots(g3(w=vw, y=v, z=v)):
+    Iyz = I.subs(y=z).change_ring(Rlex).groebner_basis(algorithm=gb_algo)
+    assert Iyz[-1].variables() == (z,)
+    for v in _uniroots(Iyz[-1]):
+        for _p in reversed(Iyz):
+            if _p.degree(x) > 0:
+                px = _p.subs(z=v)
+                if not px.is_constant():
+                    assert px.variables() == (x,)
+                    break
+        for vx in _uniroots(px):
+            for vw in _uniroots(g3(x=vx, y=v, z=v)):
                 assert all(g(vw, vx, v, v) == 0 for g in (g1, g2, g3))
                 yield vw, vx, v, v
 
 
 def _uniroots(p):
     return p.univariate_polynomial().roots(multiplicities=False)
-
-
-def _eliminate_last(R, ideal):
-    G = ideal.change_ring(R.change_ring(order="invlex")).groebner_basis()
-    return G[-1]
-
-
-def _eliminate_first(R, ideal):
-    G = ideal.change_ring(R.change_ring(order="lex")).groebner_basis()
-    return G[-1]
 
 
 def bhls_curves(a, b, c, d):
