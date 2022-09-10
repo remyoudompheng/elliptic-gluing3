@@ -39,7 +39,17 @@ def _test_small_field(q):
                 validate_morphisms(H, f1, f2, E1, E2)
                 print(f"GF({q}) t1={t1} t2={t2}", "OK")
             else:
-                print(f"GF({q}) t1={t1} t2={t2}", H)
+                # There must be a 2-isogeny realizing an anti-isometry
+                j = T11.weil_pairing(T12, 3)
+                if j == T21.weil_pairing(T22, 3):
+                    T22 = -T22
+                isogenous = False
+                for f in E1.isogenies_prime_degree(2):
+                    for g in f.codomain().isomorphisms(E2):
+                        if g(f(T11)) == E2(T21) and g(f(T12)) == E2(T22):
+                            isogenous = True
+                print(f"GF({q}) t1={t1} t2={t2} {isogenous=}")
+                assert isogenous
 
 
 def _test_random(q, n_curves=100):
@@ -59,7 +69,17 @@ def _test_random(q, n_curves=100):
             validate_morphisms(H, f1, f2, E1, E2, checks=100)
             print(f"GF({q}) t1={t1} t2={t2}", "OK")
         else:
-            print(f"GF({q}) t1={t1} t2={t2}", H)
+            # There must be a 2-isogeny
+            j = T11.weil_pairing(T12, 3)
+            if j == T21.weil_pairing(T22, 3):
+                T22 = -T22
+            isogenous = False
+            for f in E1.isogenies_prime_degree(2):
+                for g in f.codomain().isomorphisms(E2):
+                    if g(f(T11)) == T21 and g(f(T12)) == T22:
+                        isogenous = True
+            print(f"GF({q}) t1={t1} t2={t2} {isogenous=}")
+            assert isogenous
 
 
 def test_F7():
