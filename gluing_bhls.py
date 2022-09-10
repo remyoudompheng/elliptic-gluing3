@@ -4,17 +4,25 @@ Implementation of triple covers following
 Genus-2 curves and Jacobians with a given number of points
 Reinier Bröker, Everett W. Howe, Kristin E. Lauter, Peter Stevenhagen
 https://arxiv.org/abs/1403.6911
+
+The algorithm described in this article enumerates isomorphism
+classes of triple covers (H→E1,H→E2) without specifying
+an anti-isometry of group schemes between E1[3] and E2[3].
+
+The result of the algorithm is adapted to answer the problem with
+specified anti-isometry (between k-rational 3-torsion).
 """
 
 from sage.all import EllipticCurve, CRT, GF, HyperellipticCurve, PolynomialRing, proof
 from sage.schemes.hyperelliptic_curves.jacobian_morphism import (
     cantor_reduction,
     cantor_reduction_simple,
+    cantor_composition_simple,
 )
 
 # No strict primality proof
 proof.arithmetic(False)
-# Speed hack
+# Speed hack for Sage < 9.7
 def speed_hack():
     from sage.all import cached_method
 
@@ -27,16 +35,29 @@ def speed_hack():
 speed_hack()
 
 
+def debug(*args):
+    if False:
+        print(*args)
+
+
 def solve_params(j1, j2):
+    """
+    Enumerate (possibly duplicate) parameters from the universal family
+    with prescribed j-invariants.
+    """
     k = j1.parent()
     if k.degree() == 1 and k.characteristic() < 2**31:
-        return solve_params1(k, j1, j2)
+        solve = solve_params1
     elif k.characteristic() < 2**29:
-        return solve_params1(k, j1, j2)
-    elif k.degree() == 1:
-        return solve_params2(k, j1, j2)
+        solve = solve_params1
     else:
-        raise ValueError("cannot run on large prime power fields")
+        solve = solve_params2
+    for params in solve(k, j1, j2):
+        yield params
+    if j1 == 0 and j2 == 0:
+        yield k(0), k(2), k(0), 1 / k(32)
+    if j1 == k(1728) and j2 == k(1728):
+        yield k(2), k(0), 1 / k(24), k(0)
 
 
 def solve_params1(k, j1, j2):
@@ -56,6 +77,7 @@ def solve_params1(k, j1, j2):
         for vy in _uniroots(Iy.basis[0]):
             for vz in _uniroots(g3(w=v, x=v, y=vy)):
                 # print(v, v, vy, vz)
+                # assert all(g(v, v, vy, vz) == 0 for g in (g1, g2, g3))
                 yield v, v, vy, vz
     # Solve y=z
     Iyz = I.subs(y=z).elimination_ideal([w, x])
@@ -64,6 +86,7 @@ def solve_params1(k, j1, j2):
         for vw in _uniroots(Iw.basis[0]):
             for vx in _uniroots(g3(w=vw, y=v, z=v)):
                 # print(vw, vx, v, v)
+                # assert all(g(vw, vx, v, v) == 0 for g in (g1, g2, g3))
                 yield vw, vx, v, v
 
 
@@ -91,31 +114,31 @@ def solve_params2(k, j1, j2):
     # Solve w=x
     I = R.ideal([g1, g2, g3])
     Iwx = I.subs(x=w).change_ring(Rinvlex).groebner_basis(algorithm=gb_algo)
-    assert Iwx[-1].variables() == (w,)
+    # assert Iwx[-1].variables() == (w,)
     for v in _uniroots(Iwx[-1]):
         for _p in reversed(Iwx):
             if _p.degree(y) > 0:
                 py = _p.subs(w=v)
                 if not py.is_constant():
-                    assert py.variables() == (y,)
+                    # assert py.variables() == (y,)
                     break
         for vy in _uniroots(py):
             for vz in _uniroots(g3(w=v, x=v, y=vy)):
-                assert all(g(v, v, vy, vz) == 0 for g in (g1, g2, g3))
+                # assert all(g(v, v, vy, vz) == 0 for g in (g1, g2, g3))
                 yield v, v, vy, vz
     # Solve y=z
     Iyz = I.subs(y=z).change_ring(Rlex).groebner_basis(algorithm=gb_algo)
-    assert Iyz[-1].variables() == (z,)
+    # assert Iyz[-1].variables() == (z,)
     for v in _uniroots(Iyz[-1]):
         for _p in reversed(Iyz):
             if _p.degree(x) > 0:
                 px = _p.subs(z=v)
                 if not px.is_constant():
-                    assert px.variables() == (x,)
+                    # assert px.variables() == (x,)
                     break
         for vx in _uniroots(px):
             for vw in _uniroots(g3(x=vx, y=v, z=v)):
-                assert all(g(vw, vx, v, v) == 0 for g in (g1, g2, g3))
+                # assert all(g(vw, vx, v, v) == 0 for g in (g1, g2, g3))
                 yield vw, vx, v, v
 
 
@@ -158,7 +181,6 @@ def divisor(a, b, c, d, h, pt1, pt2, check=False):
     _, inv, _ = (16 * d * x**3 - 12 * c * x**2 - 1).xgcd(mumX1)
     denred = den1 % mumX1
     mumY1 = y1 * denred**2 * inv / D1  # degree 6
-
     # Point 2
     x2, y2 = pt2[0], pt2[1]
     mumX2 = 12 * D2 * (a * x**3 - 2 * b * x * x) - x2 * den2  # degree 3
@@ -166,17 +188,20 @@ def divisor(a, b, c, d, h, pt1, pt2, check=False):
     denred = den2 % mumX2
     mumY2 = y2 * denred**2 * inv / D2  # degree 6
 
-    mumX = mumX1 * mumX2
-    mumY = CRT([mumY1, mumY2], [mumX1, mumX2])
+    mumX, mumY = cantor_composition_simple([mumX1, mumY1], [mumX2, mumY2], h, 2)
 
     if check:
-        print("check1", (mumY1**2 - h) % mumX1)
-        print("check2", (mumY2**2 - h) % mumX2)
-        print("check1+2", (mumY**2 - h) % mumX)
+        # debug("check1", (mumY1**2 - h) % mumX1)
+        assert (mumY1**2 - h) % mumX1 == 0
+        # debug("check2", (mumY2**2 - h) % mumX2)
+        assert (mumY2**2 - h) % mumX2 == 0
+        # debug("check1+2", (mumY**2 - h) % mumX)
+        assert (mumY**2 - h) % mumX == 0
     mumX, mumY = cantor_reduction_simple(mumX, mumY, h, 2)
     if check:
-        print("sum", mumX, mumY)
-        print("check1+2", (mumY**2 - h) % mumX)
+        debug("====> SUM", mumX, mumY)
+        assert (mumY**2 - h) % mumX == 0
+        # debug("check1+2", (mumY**2 - h) % mumX)
     return mumX, mumY
 
 
@@ -201,28 +226,47 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
 
     j1 = E1.j_invariant()
     j2 = E2.j_invariant()
-    for a, b, c, d in solve_params(j1, j2):
-        # print("== PARAMS", a, b, c, d, "==")
-        h, e1, e2, f1, f2 = bhls_curves(a, b, c, d)
-        if h is None:
-            continue
-        try:
+
+    def isomorphisms_to(ell1, ell2):
+        isos1 = [
+            f for f in E1.isomorphisms(ell1) if f(T11).weil_pairing(f(T12), 3) == j
+        ]
+        isos2 = [
+            f for f in E2.isomorphisms(ell2) if f(T21).weil_pairing(f(T22), 3) == j * j
+        ]
+        for iso1 in isos1:
+            for iso2 in isos2:
+                yield iso1, iso2
+
+    def covers():
+        """
+        Iterator over triple covers of E1 and E2.
+        Due to automorphisms, an single isomorphism class of triple covers
+        can correspond to several triple covers with specified anti-isometry.
+        """
+        for a, b, c, d in solve_params(j1, j2):
+            debug("== PARAMS", a, b, c, d, "=======================")
+            pars = (a, b, c, d)
+            h, e1, e2, f1, f2 = bhls_curves(a, b, c, d)
+            if h is None:
+                continue
             ell1 = EllipticCurve([0, e1[2], 0, e1[1], e1[0]])
-            iso1 = E1.isomorphism_to(ell1)
             ell2 = EllipticCurve([0, e2[2], 0, e2[1], e2[0]])
-            iso2 = E2.isomorphism_to(ell2)
             twist = False
-        except ValueError:
+            for iso1, iso2 in isomorphisms_to(ell1, ell2):
+                yield h, pars, f1, f2, iso1, iso2, twist
             # Quadratic twist
             # (x, y) -> (tw*x, tw^(3/2)*y)
             ell1 = EllipticCurve([0, tw * e1[2], 0, tw**2 * e1[1], tw**3 * e1[0]])
-            iso1 = E1.isomorphism_to(ell1)
             ell2 = EllipticCurve([0, tw * e2[2], 0, tw**2 * e2[1], tw**3 * e2[0]])
-            iso2 = E2.isomorphism_to(ell2)
             twist = True
-            h = tw * h
             # Twisted morphisms: (x, y) = tw*f(x, y)
+            for iso1, iso2 in isomorphisms_to(ell1, ell2):
+                yield tw * h, pars, f1, f2, iso1, iso2, twist
 
+    for h, pars, f1, f2, iso1, iso2, twist in covers():
+        a, b, c, d = pars
+        ell1, ell2 = iso1.codomain(), iso2.codomain()
         if check:
             for _ in range(20):
                 x = k.random_element()
@@ -235,8 +279,8 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
                         continue
                     if twist:
                         x1, y1, x2, y2 = tw * x1, tw * y1, tw * x2, tw * y2
-                    assert (x1, y1) in ell1
-                    assert (x2, y2) in ell2
+                    assert iso1.dual()(ell1(x1, y1)) in E1
+                    assert iso2.dual()(ell2(x2, y2)) in E2
 
         # print(iso1.rational_maps())
         # print(iso2.rational_maps())
@@ -246,8 +290,8 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
         if check:
             assert t11 in ell1
             assert t21 in ell2
-            print("t11 =", t11)
-            print("t21 =", t21)
+            debug("t11 =", t11)
+            debug("t21 =", t21)
         if twist:
             t11 = (t11[0] / tw, t11[1] / tw)
             t21 = (t21[0] / tw, t21[1] / tw)
@@ -259,7 +303,7 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
             t22 = (t22[0] / tw, t22[1] / tw)
         DX2, DY2 = divisor(a, b, c, d, h, t12, t22, check=check)
 
-        if DX1 == 1 and DX2 == 1:
+        if (DX1 == 1 and DX2 == 1) or check:
             # Return morphisms as:
             # (x, y) -> (R1(x), y * R2(x))
             # {y²=h} => twisted e1 => E1
@@ -269,12 +313,13 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
             if twist:
                 rx, ry = tw * rx, tw * ry
             elif check:
-                assert ry**2 * h == e1(rx)
+                e1 = -iso1.codomain().defining_polynomial().subs(y=0, z=1)
+                assert ry**2 * h == e1(x=rx)
             # print("dual", iso1.dual().rational_maps())
             # print(rx, ry)
             rx, ry = [r(rx, ry) for r in iso1.dual().rational_maps()]
             if check:
-                print(rx, ry)
+                debug(rx, ry)
                 p1 = -E1.defining_polynomial()
                 assert ry**2 * h == p1(rx, 0, 1)
             proj1 = (rx, ry)
@@ -288,6 +333,7 @@ def triple_cover(E1, T11, T12, E2, T21, T22, check=False):
                 assert ry**2 * h == p2(rx, 0, 1)
             proj2 = (rx, ry)
 
-            return h, proj1, proj2
+            if DX1 == 1 and DX2 == 1:
+                return h, proj1, proj2
 
     return None, None, None

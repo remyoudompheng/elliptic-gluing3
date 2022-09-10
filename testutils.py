@@ -17,5 +17,7 @@ def torsion_basis(E):
     r1, r2 = roots[:2]
     T1 = E.lift_x(r1)
     T2 = E.lift_x(r2)
+    assert 2*T1 == -T1
+    assert 2*T2 == -T2
     assert T1.weil_pairing(T2, 3) != 1
     return T1, T2

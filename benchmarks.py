@@ -14,20 +14,18 @@ def _bench_curves(E1, T11, T12, E2, T21, T22, n=5):
     avg = (time.time() - t0) / (10 * n)
     print(f"{10*n} iters, {avg*1000:.1f}ms/iter")
 
-    print("testing BHLS")
     K = E1.base_ring()
     if K.degree() > 1 and K.characteristic() >= 2**29:
-        n = 1
+        print("skip BHLS")
+        return
     if K.characteristic() >= 2**31:
         n = 1
-    try:
-        t0 = time.time()
-        for _ in range(n):
-            gluing_bhls.triple_cover(E1, T11, T12, E2, T21, T22)
-        avg = (time.time() - t0) / n
-        print(f"{n} iters, {avg*1000:.1f}ms/iter")
-    except Exception as e:
-        print("ERROR", e)
+    print("testing BHLS")
+    t0 = time.time()
+    for _ in range(n):
+        gluing_bhls.triple_cover(E1, T11, T12, E2, T21, T22)
+    avg = (time.time() - t0) / n
+    print(f"{n} iters, {avg*1000:.1f}ms/iter")
 
 
 def bench_basic():

@@ -21,14 +21,14 @@ def check_morphisms(E1, E2, h, proj1, proj2):
         den1 = px1.denominator()
         if den1(x) != 0:
             x1, y1 = px1(x), y * py1(x)
-            assert x1, y1 in E1
+            assert (x1, y1) in E1
             points += 1
         den2 = px2.denominator()
         if den2(x) != 0:
             x2, y2 = px2(x), y * py2(x)
-            assert x2, y2 in E2
+            assert (x2, y2) in E2
             points += 1
-    print("tested", points, "points")
+    #print("tested", points, "points")
 
 
 def test_basic():
@@ -38,8 +38,8 @@ def test_basic():
     T11, T12 = torsion_basis(E1)
     T21, T22 = torsion_basis(E2)
 
-    h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
-    check_morphisms(E1, E2, h, p1, p1)
+    h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=True)
+    check_morphisms(E1, E2, h, p1, p2)
 
 
 def test_large():
@@ -51,7 +51,25 @@ def test_large():
     T21, T22 = torsion_basis(E2)
 
     h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
-    check_morphisms(E1, E2, h, p1, p1)
+    check_morphisms(E1, E2, h, p1, p2)
+
+
+def _test_small_field(q):
+    K = GF(q)
+    elems = [t for t in K if t**3 != 1]
+    for i, t1 in enumerate(elems):
+        for t2 in elems[: i + 1]:
+            E1 = make_curve(t1)
+            E2 = make_curve(t2)
+            T11, T12 = torsion_basis(E1)
+            T21, T22 = torsion_basis(E2)
+            h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
+            if h is None:
+                print(f"GF({q}) t1={t1} t2={t2}", h)
+                continue
+            else:
+                check_morphisms(E1, E2, h, p1, p2)
+                print(f"GF({q}) t1={t1} t2={t2}", "OK")
 
 
 def _test_random(q, n_curves=100):
@@ -68,16 +86,26 @@ def _test_random(q, n_curves=100):
         T21, T22 = torsion_basis(E2)
         h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
         if h is None:
-            print("FAILED", t1, t2)
+            print(f"GF({q}) t1={t1} t2={t2}", "no cover")
+            # There must be a 2-isogeny
+            assert any(f.codomain().isomorphisms(E2)
+                for f in E1.isogenies_prime_degree(2))
             continue
         check_morphisms(E1, E2, h, p1, p2)
 
+def test_F7():
+    # All curves have j-invariant 0, expect all OK
+    _test_small_field(7)
 
-def xfail_test_F31():
+def test_F13():
+    # All curves have j-invariant 0 or 1728, expect 2 singular
+    _test_small_field(13)
+
+def test_F31():
+    # Only j-invariants 29, 30
     _test_random(31)
 
-
-def xfail_test_F1009():
+def test_F1009():
     _test_random(1009)
 
 
@@ -98,11 +126,13 @@ def test_very_large2():
 
 
 if __name__ == "__main__":
+    test_F7()
+    test_F13()
     test_basic()
     test_large()
     # FIXME: tests don't pass
-    # test_F31()
-    # test_F1009()
+    test_F31()
+    test_F1009()
     test_F10007_2()
     test_very_large1()
     test_very_large2()
