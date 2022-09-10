@@ -65,8 +65,16 @@ def _test_small_field(q):
             T21, T22 = torsion_basis(E2)
             h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
             if h is None:
-                print(f"GF({q}) t1={t1} t2={t2}", h)
-                continue
+                # There must be a 2-isogeny
+                if T11.weil_pairing(T12, 3) == T21.weil_pairing(T22, 3):
+                    T22 = -T22
+                isogenous = False
+                for f in E1.isogenies_prime_degree(2):
+                    for g in f.codomain().isomorphisms(E2):
+                        if g(f(T11)) == T21 and g(f(T12)) == T22:
+                            isogenous = True
+                print(f"GF({q}) t1={t1} t2={t2} None {isogenous=}")
+                assert isogenous
             else:
                 check_morphisms(E1, E2, h, p1, p2)
                 print(f"GF({q}) t1={t1} t2={t2}", "OK")
@@ -86,12 +94,18 @@ def _test_random(q, n_curves=100):
         T21, T22 = torsion_basis(E2)
         h, p1, p2 = triple_cover(E1, T11, T12, E2, T21, T22, check=False)
         if h is None:
-            print(f"GF({q}) t1={t1} t2={t2}", "no cover")
             # There must be a 2-isogeny
-            assert any(f.codomain().isomorphisms(E2)
-                for f in E1.isogenies_prime_degree(2))
-            continue
-        check_morphisms(E1, E2, h, p1, p2)
+            if T11.weil_pairing(T12, 3) == T21.weil_pairing(T22, 3):
+                T22 = -T22
+            isogenous = False
+            for f in E1.isogenies_prime_degree(2):
+                for g in f.codomain().isomorphisms(E2):
+                    if g(f(T11)) == T21 and g(f(T12)) == T22:
+                        isogenous = True
+            print(f"GF({q}) t1={t1} t2={t2} {isogenous=}")
+            assert isogenous
+        else:
+            check_morphisms(E1, E2, h, p1, p2)
 
 def test_F7():
     # All curves have j-invariant 0, expect all OK
@@ -110,7 +124,7 @@ def test_F1009():
 
 
 def test_F10007_2():
-    _test_random(10007**2, n_curves=30)
+    _test_random(10007**2, n_curves=15)
 
 
 def test_very_large1():
@@ -130,7 +144,6 @@ if __name__ == "__main__":
     test_F13()
     test_basic()
     test_large()
-    # FIXME: tests don't pass
     test_F31()
     test_F1009()
     test_F10007_2()

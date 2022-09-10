@@ -198,6 +198,9 @@ def divisor(a, b, c, d, h, pt1, pt2, check=False):
         # debug("check1+2", (mumY**2 - h) % mumX)
         assert (mumY**2 - h) % mumX == 0
     mumX, mumY = cantor_reduction_simple(mumX, mumY, h, 2)
+    if mumX.degree() >= 3:
+        mumX, mumY = cantor_reduction(mumX, mumY, h, 0 * x, 2)
+    assert mumX.degree() <= 2
     if check:
         debug("====> SUM", mumX, mumY)
         assert (mumY**2 - h) % mumX == 0
