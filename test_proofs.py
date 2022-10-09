@@ -234,35 +234,20 @@ def test_polarity_quot():
 
     xA, yA, zA = halphen_coords(x1, y1, z1)
     xB, yB, zB = halphen_coords(x2, y2, z2)
-    m00 = (
-        3 * t1**3 * t2**3
-        - 3 * t1**2 * t2**2
-        - 2 * t1**3
-        - 2 * t2**3
-        + 3 * t1 * t2
-        + 1
-    )
-    m01 = -3 * t1**2 * t2**2 + t1**3 + t2**3 + 3 * t1 * t2 - 2
-    m02 = -3 * t1**3 * t2**2 + t1**4 + t1 * t2**3 + 3 * t1**2 * t2 - 2 * t1
-    m20 = -3 * t1**2 * t2**3 + t2**4 + t1**3 * t2 + 3 * t1 * t2**2 - 2 * t2
-    m22 = (
-        t1**4 * t2
-        + t1 * t2**4
-        + 3 * t1**2 * t2**2
-        - 3 * t1**3
-        - 3 * t2**3
-        - 2 * t1 * t2
-        + 3
-    )
 
-    M = Matrix(
-        R,
-        [
-            [m00, m01, m02],
-            [m01, m00, m02],
-            [m20, m20, m22],
-        ],
-    )
+    # fmt:off
+    m00 = 3*t1**3*t2**3 - 3*t1**2*t2**2 - 2*t1**3 - 2*t2**3 + 3*t1*t2 + 1
+    m01 = -3*t1**2*t2**2 + t1**3 + t2**3 + 3*t1*t2 - 2
+    m02 = -3*t1**3*t2**2 + t1**4 + t1*t2**3 + 3*t1**2*t2 - 2*t1
+    m20 = -3*t1**2*t2**3 + t2**4 + t1**3*t2 + 3*t1*t2**2 - 2*t2
+    m22 = t1**4*t2 + t1*t2**4 + 3*t1**2*t2**2 - 3*t1**3 - 3*t2**3 - 2*t1*t2 + 3
+
+    M = Matrix(R, [
+        [m00, m01, m02],
+        [m01, m00, m02],
+        [m20, m20, m22],
+    ])
+    # fmt:on
     pol = vector(R, [xB, yB, zB]) * M * vector(R, [xA, yA, zA])
 
     # Test on GF(5) (15625 elements)
@@ -372,12 +357,15 @@ def test_hesse_to_weierstrass():
     t, x, y, z = R.gens()
     E = x**3 + y**3 + z**3 - 3 * t * x * y * z
 
+    # fmt:off
     u = z
     v = x-y
     w = x+y+t*z
 
     W = 3*v**2*w - (4*(t**3-1)*u**3 - 9*t**2*u**2*w + 6*t*u*w**2 - w**3)
+    # fmt:on
     assert R.ideal(E).reduce(W) == 0
+
 
 if __name__ == "__main__":
     import pytest
