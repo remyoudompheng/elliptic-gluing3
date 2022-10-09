@@ -49,38 +49,43 @@ def triple_cover(E1, T11, T12, E2, T21, T22):
     XD0, XD1, XD2, XD3 = double_coords(j, t1, t2)
     YD0, YD1, YD2, YD3 = double_coords(j**2, t2, t1)
     nodes = [(XD0, YD0), (XD1, YD1), (XD2, YD2), (XD3, YD3)]
+    if nodes[0] == nodes[1]:
+        nodes = [nodes[0]] + [n for n in nodes if n != nodes[0]]
+    elif nodes[2] == nodes[3]:
+        nodes = [nodes[2]] + [n for n in nodes if n != nodes[2]]
     S = make_sextic(P1.monic(), P2.monic(), nodes)
-    # w1s = P1.roots(multiplicities=False)
-    # w2s = P2.roots(multiplicities=False)
-    X, Y = resolve_sing(S, nodes, None, None)
+    ramif = ramif1_coords(S, t1, t2)
+    assert ramif is not None
+    X, Y = resolve_sing(S, nodes, ramif=ramif)
     NX = X.numerator()
     DX = X.denominator()
     NY = Y.numerator()
     DY = Y.denominator()
     if all(pol.degree() <= 2 for pol in [NX, DX, NY, DY]):
         raise ValueError("H is singular")
-    PPX, rem = (P1[3]*NX**3 + P1[2]*NX**2*DX + P1[1]*NX*DX**2 + P1[0]* DX**3).quo_rem(DY)
-    assert rem == 0
-    const1 = PPX.lc()
-    PX = const1 * PPX.monic().sqrt()
-    PPY, rem = (P2[3]*NY**3 + P2[2]*NY**2*DY + P2[1]*NY*DY**2 + P2[0]* DY**3).quo_rem(DX)
-    assert rem == 0
-    const2 = PPY.lc()
-    PY = const2 * PPY.monic().sqrt()
-    # (x, y) => (NX/DX, PX/DX*y)
-    #assert (PX / DX**2) ** 2 * (DX * DY) == const1 * P1(NX / DX)
-    # (x, y) => (NY/DY, PY/DY*y)
-    #assert (PY / DY**2) ** 2 * (DX * DY) == const2 * P2(NY / DY)
+    # fmt:off
+    PPX, remX = (P1[3]*NX**3 + P1[2]*NX**2*DX + P1[1]*NX*DX**2 + P1[0]*DX**3).quo_rem(DY)
+    PPY, remY = (P2[3]*NY**3 + P2[2]*NY**2*DY + P2[1]*NY*DY**2 + P2[0]*DY**3).quo_rem(DX)
+    # fmt:on
+    assert remX == 0 and remY == 0
+    alpha1, alpha2 = PPX.lc(), PPY.lc()
+    u1, u2 = NX[3] / DX[3], NY[3] / DY[3]
+    PX = alpha1 * PPX.monic().sqrt()
+    PY = alpha2 * PPY.monic().sqrt()
 
-    c12 = (const1 * const2).sqrt()
+    # fmt:off
+    den12 = (t1**3-1)*(t2**3-1)
+    c12 = t1*u1+t2*u2-u1*u2*(t1*t2+2) - (1 + 2*(t1*t2-1)**3/den12)/K(3)
+    assert c12*c12 == alpha1*alpha2
 
     def f1(x, y):
-        return (a1 * NX(x) / DX(x) + b1, PX(x) / DX(x) ** 2 * y * c1 / const1)
+        return (a1 * NX(x)/DX(x) + b1, PX(x)/DX(x)**2 * y * c1 / alpha1)
 
     def f2(x, y):
-        return (a2 * NY(x) / DY(x) + b2, PY(x) / DY(x) ** 2 * y * c2 / c12)
+        return (a2 * NY(x)/DY(x) + b2, PY(x)/DY(x)**2 * y * c2 / c12)
+    # fmt:on
 
-    H = const1 * DX * DY
+    H = alpha1 * DX * DY
     return H, f1, f2
 
 
@@ -145,6 +150,24 @@ def double_coords(j, t1, t2):
     return d0, num / den1, num / den2, num / den3
 
 
+def ramif1_coords(S, t1, t2):
+    # fmt:off
+    num = 4*t1**2*t2**3  - t1**2 - t2**4 - 6*t1*t2**2 + 4*t2
+    den = 4*(t1**3-1)*(t2**3-1)
+    # fmt:on
+    x = num / den
+    P = S(u=x).univariate_polynomial()
+    if P.degree() >= 2:
+        quo, gcd = P.quo_rem(derivative(P))
+        if gcd == 0:
+            gcd = quo
+        y = -gcd[0]/gcd[1]
+        return (x, y)
+    assert P.degree() == 0
+    # Special cover, a Weierstrass point
+    return (x, None)
+
+
 def make_sextic(P1, P2, nodes):
     K = P1.base_ring()
     assert P1[3] == 1 and P2[3] == 1
@@ -192,20 +215,14 @@ def make_sextic(P1, P2, nodes):
     return known + rest
 
 
-def resolve_sing(S, nodes, w1s, w2s):
+def resolve_sing(S, nodes, ramif):
     """
     Resolution of singularities for a (3,3)-curve with 4 nodes
     Optional points (w1, infty) or (infty, w2) are provided
     """
-    N0, N1, N2, N3 = nodes
-    if any(nodes[i] == nodes[j] for i in range(3) for j in range(i + 1, 4)):
-        # triple point, arrange for N0 to be the triple point
-        # and N1 to be the other one
-        if N0 != N1:
-            if N0 != N2:
-                N0, N1 = N1, N0
-        else:  # N0 is the triple point
-            N1 = N2 if N2 != N0 else N3
+    if ramif in nodes:
+        nodes = [ramif] + [n for n in nodes if n != ramif]
+
     # Resolve N0
     K = S.base_ring()
     R = K["x", "y", "z"]
@@ -222,12 +239,13 @@ def resolve_sing(S, nodes, w1s, w2s):
     x, y, z = R.gens()
     T = RT.gen()
     # Center on N0
-    x0, y0 = N0
+    x0, y0 = nodes[0]
     S = S(x, y).homogenize(var=z)
     S1 = S(x + x0 * z, y + y0 * z, z)
 
     Q = div_monom(S1(y * z, z * x, x * y), x**3 * y**3 * z**2)
-    if N0 in (N2, N3):
+    if len(nodes) == 2:
+        N0, N1 = nodes
         # Special case of triple ramification.
         Q = div_monom(Q, z)
         x1, y1 = N1
@@ -243,7 +261,7 @@ def resolve_sing(S, nodes, w1s, w2s):
         assert S(X, Y, 1) == 0
         return X, Y
 
-    (x1, y1), (x2, y2), (x3, y3) = N1, N2, N3
+    (x1, y1), (x2, y2), (x3, y3) = nodes[1:]
     # fmt:off
     M = Matrix(K, [
         [y1-y0, x1-x0, (x1-x0)*(y1-y0)],
@@ -256,34 +274,36 @@ def resolve_sing(S, nodes, w1s, w2s):
     QT = Q(u, v, w)
     C = div_monom(QT(y * z, z * x, y * x), (x * y * z) ** 2)
     assert C.total_degree() == 2
-    # print("C", C // (x*y*z)**2)
-    if w1s or w2s:
-        if w1s:
-            rat = (1 / (w1s[0] - x0), 0, 1)  # use x=w1
-        else:
-            rat = (0, 1 / (w2s[0] - y0), 1)  # use y=w2
-        rat = M.inverse() * vector(rat)
-        rat = (rat[2] / rat[0], rat[2] / rat[1], 1)  # normalized (yz,zx,xy)
+
+    if ramif == (x0, y0):
+        rat = (1, 0, 0)  # vertical tangent
+    elif ramif[1] is None:
+        rat = (1 / (ramif[0] - x0), 0, 1)  # at infinity
     else:
-        # Try to find a rational point on a finite field
-        for _ in range(20):
-            xval = K.random_element()
-            ys = C(x=xval, z=1).univariate_polynomial().roots(multiplicities=False)
-            if ys:
-                # print("rational point", (xval, ys[0], 1))
-                rat = (xval, ys[0], 1)
-                break
+        rat = (1 / (ramif[0] - x0), 1 / (ramif[1] - y0), 1)
+    assert Q(*rat) == 0
+    rat = M.inverse() * vector(rat)
+    assert QT(*rat) == 0
+    rat = (rat[2] / rat[0], rat[2] / rat[1])
+
     CT = C(rat[0] * z + x, rat[1] * z + y, z)
     # a x^2 + b xy + c y^2 + dx + ey = 0 and y = ux => x=-(d+et)/(a+bt+ct^2)
-    num = CT[1, 0, 1] + CT[0, 1, 1] * T
-    den = CT[2, 0, 0] + CT[1, 1, 0] * T + CT[0, 2, 0] * T**2
-    x_CT, y_CT, z_CT = -num, -T * num, den
-    # Pull back
-    x_C = x_CT + rat[0] * z_CT
-    y_C = y_CT + rat[1] * z_CT
-    z_C = z_CT
-    x_QT, y_QT, z_QT = y_C * z_C, z_C * x_C, x_C * y_C
-    x_Q, y_Q, z_Q = M * vector([x_QT, y_QT, z_QT])
+    for Tparam in [T] + [K(a) + 1 / T for a in range(7)]:
+        num = CT[1, 0, 1] + CT[0, 1, 1] * Tparam
+        den = CT[2, 0, 0] + CT[1, 1, 0] * Tparam + CT[0, 2, 0] * Tparam**2
+        x_CT, y_CT, z_CT = -num, -Tparam * num, den
+        if Tparam != T:
+            x_CT = (x_CT * T**2).numerator()
+            y_CT = (y_CT * T**2).numerator()
+            z_CT = (z_CT * T**2).numerator()
+        x_C, y_C, z_C = x_CT + rat[0] * z_CT, y_CT + rat[1] * z_CT, z_CT
+        x_QT, y_QT, z_QT = y_C * z_C, z_C * x_C, x_C * y_C
+        x_Q, y_Q, z_Q = M * vector([x_QT, y_QT, z_QT])
+        if z_Q.degree() == 4:
+            xQinf, yQinf = x_Q[4] / z_Q[4], y_Q[4] / z_Q[4]
+            if Q(xQinf, 0, 1) != 0 and Q(0, yQinf, 1) != 0:
+                break
+
     x_S1, y_S1, z_S1 = y_Q * z_Q, z_Q * x_Q, x_Q * y_Q
     X = x0 + x_S1 / z_S1
     Y = y0 + y_S1 / z_S1
