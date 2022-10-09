@@ -17,14 +17,13 @@ def curve_params(E, j, T1, T2):
     return t, P, a, b
 
 def double_coords(j, t1, t2):
+    j2 = j*j
     d0 = (t1**2 - t2) / (t1**3 - 1)
-    num1 = j*(t1*t2 - 1)
-    den1 = num1*t1 - (t1**2 - j**2*t1*t2 - t2 + j**2)
-    num2 = j**2*(t1*t2 - 1)
-    den2 = num2*t1 - (t1**2 - j*t1*t2 - t2 + j)
-    num3 = t1*t2 - 1
-    den3 = num3*t1 - (t1**2 - t1*t2 - t2 + 1)
-    return d0, num1 / den1, num2 / den2, num3 / den3
+    num = t1*t2 - 1
+    den1 = (t1-1)*(t1-j2)*(t2-j2)
+    den2 = (t1-1)*(t1-j)*(t2-j)
+    den3 = (t2-1)*(t1-j)*(t1-j2)
+    return d0, num / den1, num / den2, num / den3
 
 def double_points(j, t1, t2):
     XD0, XD1, XD2, XD3 = double_coords(j, t1, t2)

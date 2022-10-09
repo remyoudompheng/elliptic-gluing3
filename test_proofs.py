@@ -179,6 +179,51 @@ def test_twisted_duals():
     assert R.ideal(E).reduce(D) == 0
 
 
+def test_double_points():
+    "Test coordinates of the double points"
+    j = QQ["j"].gen()
+    Qj = QQ.extension(j**2 + j + 1, names=["j"])
+    j = Qj.gen()
+    R = Qj["t1", "t2", "x", "y", "z"]
+    t1, t2, x, y, z = R.gens()
+
+    E = x**3 + y**3 + z**3 - 3 * t1 * x * y * z
+    # fmt:off
+    u, v, w = x, y, z
+    t = t2
+    D0 = 3*t*u**2*v**2*w**2 - u**3*v**3 - u**3*w**3 - v**3*w**3
+    D1 = (u**6+v**6+w**6) \
+        + (3*j*t-1)*(u**3*v**3 + v**3*w**3+w**3*u**3) \
+        - 3*j*(j*t+1)*(u**4*v*w+v**4*w*u+w**4*u*v) \
+        + (3*j*u*v*w)**2
+    D2 = (u**6+v**6+w**6) \
+        + (3*j**2*t-1)*(u**3*v**3 + v**3*w**3+w**3*u**3) \
+        - 3*j**2*(j**2*t+1)*(u**4*v*w+v**4*w*u+w**4*u*v) \
+        + (3*j**2*u*v*w)**2
+    D3 = (u**6+v**6+w**6) \
+        + (3*t-1)*(u**3*v**3 + v**3*w**3+w**3*u**3) \
+        - 3*(t+1)*(u**4*v*w+v**4*w*u+w**4*u*v) \
+        + (3*u*v*w)**2
+    # fmt:on
+
+    X, Y, Z = halphen_coords(x, y, z)
+    V = X + Y + t1 * Z
+
+    # Z/(X+Y+t1*Z) == n0/d0
+    n0, d0 = t1**2 - t2, t1**3 - 1
+    assert R.ideal([E, D0]).reduce(n0 * V - d0 * Z) == 0
+    n1, d1 = t1 * t2 - 1, (t1 - 1) * (t1 - j**2) * (t2 - j**2)
+    assert R.ideal([E, D1]).reduce(n1 * V - d1 * Z) == 0
+    n2, d2 = t1 * t2 - 1, (t1 - 1) * (t1 - j) * (t2 - j)
+    assert R.ideal([E, D2]).reduce(n2 * V - d2 * Z) == 0
+    n3, d3 = t1 * t2 - 1, (t2 - 1) * (t1 - j) * (t1 - j**2)
+    assert R.ideal([E, D3]).reduce(n3 * V - d3 * Z) == 0
+
+    # Extra identities
+    assert j * d1 == j * t1 * (t1 * t2 - 1) - (t1**2 - j**2 * t1 * t2 - t2 + j**2)
+    assert j**2 * d2 == j**2 * t1 * (t1 * t2 - 1) - (t1**2 - j * t1 * t2 - t2 + j)
+    assert d3 == t1 * (t1 * t2 - 1) - (t1**2 - t1 * t2 - t2 + 1)
+
 def test_polarity_quot():
     "Verifies formulas for the quotient projective transformation"
     R = ZZ["x1", "y1", "z1", "x2", "y2", "z2", "t1", "t2"]
