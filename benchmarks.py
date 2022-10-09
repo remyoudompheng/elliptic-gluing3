@@ -1,10 +1,19 @@
 import time
 from sage.all import GF, EllipticCurve
-from testutils import make_curve, torsion_basis
+from sage.misc.sage_timeit import sage_timeit
 
+from testutils import make_curve, torsion_basis
 import gluing3
 import gluing_bhls
 
+
+def _bench_field(K):
+    # Field ops benchmark
+    x1 = K.random_element()
+    x2 = K.random_element()**2
+    tsmul = sage_timeit('x1*x2', {"x1": x1, "x2": x2}, preparse=False)
+    tsqrt = sage_timeit('x2.sqrt()', {"x1": x1, "x2": x2}, preparse=False)
+    print(f"mul: {tsmul}, sqrt: {tsqrt}")
 
 def _bench_curves(E1, T11, T12, E2, T21, T22, n=5):
     print("testing gluing3")
@@ -31,6 +40,7 @@ def _bench_curves(E1, T11, T12, E2, T21, T22, n=5):
 def bench_basic():
     K = GF(4099)
     print(f"=== {K} ===")
+    _bench_field(K)
     E1 = EllipticCurve(K, [-961, -1125])
     E2 = EllipticCurve(K, [1044, 354])
     T11, T12 = torsion_basis(E1)
@@ -44,6 +54,7 @@ def bench_sikelike():
     p = 2**12 * 3**5 - 1
     K = GF(p**2)
     print(f"=== {K} ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(7)[0].codomain()
     print("E1:", E1)
@@ -60,6 +71,7 @@ def bench_largep():
     p = 2**31 - 1
     K = GF(p)
     print(f"=== {K} ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = make_curve(K(0xDEADC0DE))
     E2 = make_curve(K(0xF00D900D))
@@ -73,6 +85,7 @@ def bench_largep2():
     x = GF(p)["x"].gen()
     K = GF(p**2, names="i", modulus=x**2 + 1)
     print(f"=== {K} ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(7)[0].codomain()
     T11, T12 = torsion_basis(E1)
@@ -87,6 +100,7 @@ def bench_bigp():
     p = 2**109 * 3**64 + 1
     K = GF(p)
     print(f"=== {K} ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = make_curve(K(7) ** 0xDEADC0DE)
     E2 = make_curve(K(11) ** 0xF00D900D)
@@ -100,6 +114,7 @@ def bench_bigp2():
     x = GF(p)["x"].gen()
     K = GF(p**2, names="i", modulus=x**2 + 1)
     print(f"=== {K} ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(7)[0].codomain()
     E2 = E.isogenies_prime_degree(11)[0].codomain()
@@ -112,6 +127,7 @@ def bench_verybigp():
     p = 2**372 * 3**236 + 1
     K = GF(p)
     print("=== GF(2^372*3^236 + 1) ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = make_curve(K(7) ** 0xDEADC0DE)
     E2 = make_curve(K(11) ** 0xF00D900D)
@@ -125,6 +141,7 @@ def bench_verybigp2():
     x = GF(p)["x"].gen()
     K = GF(p**2, names="i", modulus=x**2 + 1)
     print("=== GF((2^372*3^239-1)^2) ===")
+    _bench_field(K)
     E = EllipticCurve(K, [0, 1])
     E1 = E.isogenies_prime_degree(7)[0].codomain()
     E2 = E.isogenies_prime_degree(11)[0].codomain()
