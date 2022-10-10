@@ -13,7 +13,7 @@ The result of the algorithm is adapted to answer the problem with
 specified anti-isometry (between k-rational 3-torsion).
 """
 
-from sage.all import EllipticCurve, CRT, GF, HyperellipticCurve, PolynomialRing, proof
+from sage.all import EllipticCurve, GF, PolynomialRing, proof
 from sage.schemes.hyperelliptic_curves.jacobian_morphism import (
     cantor_reduction,
     cantor_reduction_simple,
@@ -24,7 +24,10 @@ from sage.schemes.hyperelliptic_curves.jacobian_morphism import (
 proof.arithmetic(False)
 # Speed hack for Sage < 9.7
 def speed_hack():
+    from sage.misc.banner import require_version
     from sage.all import cached_method
+    if require_version(9, 7):
+        return
 
     p = 2**127 - 1  # Arbitrary large prime
     to_patch = [GF(3), GF(3**2), GF(p), GF(p**2)]

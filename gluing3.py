@@ -14,22 +14,22 @@ being dominated by the 2 square roots.
 
 from sage.all import (
     Curve,
-    EllipticCurve,
-    EllipticCurve_from_cubic,
     GF,
     Matrix,
     ProjectiveSpace,
     derivative,
-    factor,
     proof,
     vector,
 )
 
 # No strict primality proof
 proof.arithmetic(False)
-# Speed hack
+# Speed hack for Sage < 9.7
 def speed_hack():
+    from sage.misc.banner import require_version
     from sage.all import cached_method
+    if require_version(9, 7):
+        return
 
     p = 2**127 - 1  # Arbitrary large prime
     to_patch = [GF(3), GF(3**2), GF(p), GF(p**2)]
