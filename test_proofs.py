@@ -120,6 +120,20 @@ def test_ramification_quot():
             )
             assert I.reduce(ram) == 0
 
+def test_ramification():
+    j = QQ["j"].gen()
+    Qj = QQ.extension(j**2 + j + 1, names=["j"])
+    j = Qj.gen()
+    R = Qj["t1", "t2", "x", "y", "z"]
+    t1, t2, x, y, z = R.gens()
+    Rxyz = Qj[x,y,z]
+    X, Y, Z = halphen_coords(x, y, z)
+
+    num = 4*t1**2*t2**3  - t1**2 - t2**4 - 6*t1*t2**2 + 4*t2
+    den = 4*(t1**3-1)*(t2**3-1)
+    L = (X + Y + t1*Z)*num - Z*den
+    I = R.ideal(hesse(Rxyz, t1), dual_hesse(Rxyz, t2))
+    assert I.reduce(L) == 0
 
 def test_twisted_duals():
     j = QQ["j"].gen()

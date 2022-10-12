@@ -40,16 +40,9 @@ def double_points(j, t1, t2):
 def ramif1_coords(S, t1, t2):
     num = 4*t1**2*t2**3  - t1**2 - t2**4 - 6*t1*t2**2 + 4*t2
     den = 4*(t1**3-1)*(t2**3-1)
-    x = num/den
-    P = S(u=x).univariate_polynomial()
-    if P.degree() >= 2:
-        quo, gcd = P.quo_rem(derivative(P))
-        if gcd == 0:
-            gcd = quo
-        y = -gcd[0]/gcd[1]
-        return (x, y)
-    assert P.degree() == 0
-    return (x, None)
+    deny = t2**3 - 3*t1*t2 + 2
+    x = num / den
+    return (x, (t2**2 - t1)/deny if deny != 0 else None)
 
 def rational_sextic(P1, P2, nodes):
     assert P1[3] == 1 and P2[3] == 1
